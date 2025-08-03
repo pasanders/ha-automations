@@ -1,0 +1,42 @@
+  alias: Waterverbruik Alert (Langdurig)
+  description: Stuurt een Telegram melding als waterverbruik langer dan 5 min duurt
+    (>4 l/m).
+  triggers:
+  - entity_id:
+    - input_number.tijdsduur_waterverbruik
+    above: 300
+    trigger: numeric_state
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.watermeter_active_water_usage
+    above: 4
+  actions:
+  - repeat:
+      while:
+      - condition: numeric_state
+        entity_id: input_number.tijdsduur_waterverbruik
+        above: 300
+      - condition: numeric_state
+        entity_id: sensor.watermeter_active_water_usage
+        above: 4
+      sequence:
+      - variables:
+          huidig_totaal: '{{ states(''sensor.watermeter_total_water_usage'') | float(0)
+            }}'
+          begin: '{{ states(''input_number.waterverbruik_startwaarde'') | float(0)
+            }}'
+          verbruik_l: '{{ states(''input_number.waterverbruik_sinds_starten'') | round(1)
+            }}'
+          minuten_bezig: '{{ (states(''input_number.tijdsduur_waterverbruik'') | float(0)
+            / 60) | round(1) }}'
+          actief_verbruik: '{{ states(''sensor.watermeter_active_water_usage'') |
+            float(0) | round(1) }}'
+      - data:
+          title: "\U0001F6A8 Waterverbruik melding."
+          message: 'Nieuwe melding waterverbruik is al {{ minuten_bezig }} minuten
+            bezig (> 4 l/m)!  Huidig actief verbruik: {{ actief_verbruik }} l/m.  Verbruik
+            sinds start: {{ verbruik_l }} liter.  Beginstand: {{ begin }} m³.  Huidige
+            stand: {{ huidig_totaal }} m³.'
+        action: notify.telegram_main
+      - delay: 00:01:00
+  mode: single
