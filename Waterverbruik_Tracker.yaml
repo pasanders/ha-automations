@@ -1,0 +1,80 @@
+  alias: Waterverbruik Tracker
+  description: Houdt waterverbruik bij boven 4 l/m en update helpers elke 5 seconden.
+  triggers:
+  - entity_id: sensor.watermeter_active_water_usage
+    above: 4
+    id: start_usage
+    trigger: numeric_state
+  - entity_id: sensor.watermeter_active_water_usage
+    below: 4.01
+    id: stop_usage
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: start_usage
+      sequence:
+      - target:
+          entity_id: input_datetime.waterverbruik_starttijd
+        data:
+          datetime: '{{ now().isoformat() }}'
+        action: input_datetime.set_datetime
+      - target:
+          entity_id: input_number.waterverbruik_startwaarde
+        data:
+          value: '{{ states(''sensor.watermeter_total_water_usage'') | float(0) }}'
+        action: input_number.set_value
+      - target:
+          entity_id: input_number.waterverbruik_sinds_starten
+        data:
+          value: 0
+        action: input_number.set_value
+      - target:
+          entity_id: input_number.tijdsduur_waterverbruik
+        data:
+          value: 0
+        action: input_number.set_value
+      - repeat:
+          while:
+          - condition: template
+            value_template: '{{ states(''sensor.watermeter_active_water_usage'') |
+              float(0) > 4 }}'
+          sequence:
+          - delay: 00:00:05
+          - target:
+              entity_id: input_number.waterverbruik_sinds_starten
+            data:
+              value: '{{ ((states(''sensor.watermeter_total_water_usage'') | float(0))
+                - (states(''input_number.waterverbruik_startwaarde'') | float(0)))
+                * 1000 | round(1) }}'
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.tijdsduur_waterverbruik
+            data:
+              value: '{{ (now() - (states.input_datetime.waterverbruik_starttijd.state
+                | as_datetime | as_local)).total_seconds() | int }}'
+            action: input_number.set_value
+    - conditions:
+      - condition: trigger
+        id: stop_usage
+      - condition: template
+        value_template: '{{ states(''input_datetime.waterverbruik_starttijd'') !=
+          ''unknown'' and states(''input_datetime.waterverbruik_starttijd'') != none
+          }}'
+      sequence:
+      - target:
+          entity_id: input_number.waterverbruik_sinds_starten
+        data:
+          value: '{{ ((states(''sensor.watermeter_total_water_usage'') | float(0))
+            - (states(''input_number.waterverbruik_startwaarde'') | float(0))) * 1000
+            | round(1) }}'
+        action: input_number.set_value
+      - target:
+          entity_id: input_number.tijdsduur_waterverbruik
+        data:
+          value: '{{ (now() - (states.input_datetime.waterverbruik_starttijd.state
+            | as_datetime | as_local)).total_seconds() | int }}'
+        action: input_number.set_value
+  mode: restart
